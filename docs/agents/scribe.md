@@ -34,7 +34,7 @@ fullsend agent add \
 |----------|----------|-------------|
 | `REPO` | yes | Target GitHub repository (`owner/name`) |
 | `SEARCH_QUERY` | yes | Drive search term for meeting note doc names |
-| `LOOKBACK_HOURS` | no | How far back to search Drive (default: 168) |
+| `LOOKBACK_HOURS` | no | How far back to search Drive (default: 3) |
 | `DRY_RUN` | yes | `true` to preview; `false` for live writes |
 | `MIN_CONFIDENCE` | no | Minimum confidence threshold (default: 0.6) |
 | `MODE` | no | `all`, `comments_only`, or `new_issues_only` |

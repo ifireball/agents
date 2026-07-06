@@ -13,7 +13,7 @@
 #
 # Optional env vars:
 #   SCRIBE_NAME_FILTER    — substring filter on doc names
-#   SCRIBE_LOOKBACK_HOURS — how far back to search (default: 168)
+#   SCRIBE_LOOKBACK_HOURS — how far back to search (default: 3)
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ META_FILE="${WORK_DIR}/scribe-meta.json"
 
 mkdir -p "${NOTES_DIR}"
 
-LOOKBACK="${SCRIBE_LOOKBACK_HOURS:-168}"
+LOOKBACK="${SCRIBE_LOOKBACK_HOURS:-3}"
 # RFC3339 with Z suffix — matches the Go code's time.RFC3339 format
 CUTOFF_DATE=$(date -u -d "${LOOKBACK} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
   || date -u -v-"${LOOKBACK}"H +"%Y-%m-%dT%H:%M:%SZ")
