@@ -128,16 +128,30 @@ contains_suspicious_unicode() {
   return 1
 }
 
+# Strip GHA workflow-command metacharacters from agent-controlled log output.
+sanitize_gha() {
+  local val="$1"
+  val="${val//::/}"
+  val="${val//%0A/}"
+  val="${val//%0a/}"
+  val="${val//%0D/}"
+  val="${val//%0d/}"
+  printf '%s' "${val}"
+}
+
 CONTENT_GATE_REJECTIONS=0
 
 gate_reject() {
   local topic="$1" reason="$2"
+  topic=$(sanitize_gha "${topic}")
+  reason=$(sanitize_gha "${reason}")
   echo "  GATE REJECTED: [${topic}] — ${reason}"
   REJECTED=$((REJECTED + 1))
 }
 
 gate_reject_content() {
   local index="$1" total="$2" category="$3"
+  category=$(sanitize_gha "${category}")
   echo "  GATE REJECTED: item ${index} of ${total} — content gate: ${category}"
   REJECTED=$((REJECTED + 1))
   CONTENT_GATE_REJECTIONS=$((CONTENT_GATE_REJECTIONS + 1))
@@ -216,11 +230,16 @@ for i in $(seq 0 $((TOPIC_COUNT - 1))); do
   OMIT=$(jq -r ".topics[${i}].omit_reason // empty" "${RESULT_FILE}")
 
   if [[ -n "${OMIT}" ]]; then
-    echo "  OMITTED: [${TOPIC}] — ${OMIT}"
+    echo "  OMITTED: [$(sanitize_gha "${TOPIC}")] — $(sanitize_gha "${OMIT}")"
     continue
   fi
 
   if [[ -z "${ISSUE_NUM}" || "${ISSUE_NUM}" == "null" ]]; then
+    continue
+  fi
+
+  if [[ ! "${ISSUE_NUM}" =~ ^[1-9][0-9]*$ ]]; then
+    gate_reject "${TOPIC}" "invalid existing_issue number"
     continue
   fi
 
@@ -260,12 +279,14 @@ for i in $(seq 0 $((TOPIC_COUNT - 1))); do
     continue
   fi
 
-  echo "  PASS: [${TOPIC}] → comment on #${ISSUE_NUM} (confidence: ${CONFIDENCE})"
-  COMMENT_TOPICS+=("${TOPIC}")
-  COMMENT_ISSUES+=("${ISSUE_NUM}")
+  SAFE_TOPIC=$(sanitize_gha "${TOPIC}")
+  SAFE_CONFIDENCE=$(sanitize_gha "${CONFIDENCE}")
+  echo "  PASS: [${SAFE_TOPIC}] → comment on #${ISSUE_NUM} (confidence: ${SAFE_CONFIDENCE})"
 
   if [[ "${DRY_RUN}" == "true" ]]; then
     echo "    [DRY RUN] Would post comment to ${SCRIBE_REPO}#${ISSUE_NUM}"
+    COMMENT_TOPICS+=("${SAFE_TOPIC}")
+    COMMENT_ISSUES+=("${ISSUE_NUM}")
   else
     # Idempotency: prefer notes URL; fall back to issue + topic + meeting date
     NOTES_URL=$(printf '%s' "${SUMMARY}" | grep -oP '\[Meeting notes\]\(\K[^)]+' || echo "")
@@ -287,6 +308,8 @@ for i in $(seq 0 $((TOPIC_COUNT - 1))); do
 
     printf '%s' "${SUMMARY}" | gh issue comment "${ISSUE_NUM}" --repo "${SCRIBE_REPO}" --body-file -
     POSTED=$((POSTED + 1))
+    COMMENT_TOPICS+=("${SAFE_TOPIC}")
+    COMMENT_ISSUES+=("${ISSUE_NUM}")
   fi
 done
 
@@ -351,8 +374,10 @@ for i in $(seq 0 $((NEW_COUNT - 1))); do
     continue
   fi
 
-  echo "  PASS: [${TITLE}] → new issue (confidence: ${CONFIDENCE})"
-  NEW_ISSUE_TITLES+=("${TITLE}")
+  SAFE_TITLE=$(sanitize_gha "${TITLE}")
+  SAFE_CONFIDENCE=$(sanitize_gha "${CONFIDENCE}")
+  echo "  PASS: [${SAFE_TITLE}] → new issue (confidence: ${SAFE_CONFIDENCE})"
+  NEW_ISSUE_TITLES+=("${SAFE_TITLE}")
 
   # Prepend auto-generated banner so reviewers know this was machine-created
   BANNER='> [!NOTE]
@@ -363,8 +388,8 @@ for i in $(seq 0 $((NEW_COUNT - 1))); do
   FULL_BODY="${BANNER}${BODY}"
 
   if [[ "${DRY_RUN}" == "true" ]]; then
-    echo "    [DRY RUN] Would create issue: ${TITLE}"
-    echo "    [DRY RUN] Labels: ${LABELS}"
+    echo "    [DRY RUN] Would create issue: ${SAFE_TITLE}"
+    echo "    [DRY RUN] Labels: $(sanitize_gha "${LABELS}")"
     echo "    [DRY RUN] Body length: ${BODY_LEN} chars"
     NEW_ISSUE_URLS+=("")
   else
