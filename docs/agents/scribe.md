@@ -40,6 +40,7 @@ fullsend agent add \
 | `MODE` | no | `all`, `comments_only`, or `new_issues_only` |
 | `GH_TOKEN` | yes | GitHub token with issues read/write |
 | `GOOGLE_APPLICATION_CREDENTIALS` | yes | GCP service account key for Drive read |
+| `SCRIBE_DRIVE_CREDENTIALS` | no | Override path to a Drive-scoped SA key (pre-script only; defaults to `GOOGLE_APPLICATION_CREDENTIALS`) |
 | `SLACK_WEBHOOK_URL` | no | Optional Slack notification after run |
 
 ### Modes

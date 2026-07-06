@@ -267,15 +267,22 @@ for i in $(seq 0 $((TOPIC_COUNT - 1))); do
   if [[ "${DRY_RUN}" == "true" ]]; then
     echo "    [DRY RUN] Would post comment to ${SCRIBE_REPO}#${ISSUE_NUM}"
   else
-    # Idempotency: check if we already commented with this notes URL
-    NOTES_URL=$(jq -r ".topics[${i}].summary" "${RESULT_FILE}" | grep -oP '\[Meeting notes\]\(\K[^)]+' || echo "")
+    # Idempotency: prefer notes URL; fall back to issue + topic + meeting date
+    NOTES_URL=$(printf '%s' "${SUMMARY}" | grep -oP '\[Meeting notes\]\(\K[^)]+' || echo "")
+    MEETING_DATE=$(printf '%s' "${SUMMARY}" | grep -oP '(?<=\*\*Meeting update — ).*?(?=\*\*)' || echo "")
+    EXISTING=0
     if [[ -n "${NOTES_URL}" ]]; then
       EXISTING=$(gh api "repos/${SCRIBE_REPO}/issues/${ISSUE_NUM}/comments" 2>/dev/null \
         | jq --arg url "${NOTES_URL}" '[.[] | select(.body | contains($url))] | length' 2>/dev/null || echo "0")
-      if [[ "${EXISTING}" -gt 0 ]]; then
-        echo "    SKIP: duplicate comment (notes URL already posted)"
-        continue
-      fi
+    elif [[ -n "${MEETING_DATE}" ]]; then
+      EXISTING=$(gh api "repos/${SCRIBE_REPO}/issues/${ISSUE_NUM}/comments" 2>/dev/null \
+        | jq --arg date "${MEETING_DATE}" --arg topic "${TOPIC}" \
+          '[.[] | select(.body | contains("**Meeting update — " + $date + "**") and contains($topic))] | length' \
+          2>/dev/null || echo "0")
+    fi
+    if [[ "${EXISTING}" -gt 0 ]]; then
+      echo "    SKIP: duplicate comment (already posted for this meeting/issue)"
+      continue
     fi
 
     printf '%s' "${SUMMARY}" | gh issue comment "${ISSUE_NUM}" --repo "${SCRIBE_REPO}" --body-file -

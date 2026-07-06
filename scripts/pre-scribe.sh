@@ -13,7 +13,7 @@
 #
 # Optional env vars:
 #   SCRIBE_NAME_FILTER    — substring filter on doc names
-#   SCRIBE_LOOKBACK_HOURS — how far back to search (default: 3)
+#   SCRIBE_LOOKBACK_HOURS — how far back to search (default: 168)
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ META_FILE="${WORK_DIR}/scribe-meta.json"
 
 mkdir -p "${NOTES_DIR}"
 
-LOOKBACK="${SCRIBE_LOOKBACK_HOURS:-3}"
+LOOKBACK="${SCRIBE_LOOKBACK_HOURS:-168}"
 # RFC3339 with Z suffix — matches the Go code's time.RFC3339 format
 CUTOFF_DATE=$(date -u -d "${LOOKBACK} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
   || date -u -v-"${LOOKBACK}"H +"%Y-%m-%dT%H:%M:%SZ")
@@ -229,8 +229,11 @@ while read -r doc; do
 
   echo "  Downloading: ${DOC_NAME}"
 
+  set +e
   RAW_TEXT=$(export_doc_with_retry "${DOC_ID}")
-  if [[ $? -ne 0 ]] || [[ -z "${RAW_TEXT}" ]]; then
+  EXPORT_RC=$?
+  set -e
+  if [[ ${EXPORT_RC} -ne 0 ]] || [[ -z "${RAW_TEXT}" ]]; then
     echo "  WARNING: could not export doc ${DOC_ID}, skipping"
     DOCS_FAILED=$((DOCS_FAILED + 1))
     continue
